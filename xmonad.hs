@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fglasgow-exts #-} -- required for XMonad.Layout.MultiToggle
 import XMonad
 import XMonad.Hooks.DynamicLog
 import XMonad.Hooks.EwmhDesktops
@@ -29,6 +30,8 @@ import XMonad.Actions.FindEmptyWorkspace
 import XMonad.Layout.IndependentScreens
 import XMonad.Layout.Magnifier as Mag
 import XMonad.Config.Gnome
+import XMonad.Layout.MultiToggle
+import XMonad.Layout.MultiToggle.Instances
 
 -- workspaces' :: [WorkspaceId]
 -- workspaces' =  ["a", "b", "c", "d", "e", "f", "g", "h", "i"]
@@ -71,7 +74,7 @@ keys' conf@(XConfig {XMonad.modMask = modMask}) = M.fromList $
     , ((modMask,               xK_Tab   ), windows W.focusDown) -- %! Move focus to the next window
     , ((modMask,               xK_j     ), windows W.focusDown) -- %! Move focus to the next window
     , ((modMask,               xK_k     ), windows W.focusUp  ) -- %! Move focus to the previous window
-    , ((modMask,               xK_m     ), windows W.focusMaster  ) -- %! Move focus to the master window
+    , ((modMask .|. shiftMask, xK_Return), windows W.focusMaster  ) -- %! Move focus to the master window
 
     -- modifying the window order
     , ((modMask,               xK_Return), windows W.swapMaster) -- %! Swap the focused window and the master window
@@ -81,7 +84,9 @@ keys' conf@(XConfig {XMonad.modMask = modMask}) = M.fromList $
     -- resizing the master/slave ratio
     , ((modMask,               xK_h     ), sendMessage Shrink) -- %! Shrink the master area
     , ((modMask,               xK_l     ), sendMessage Expand) -- %! Expand the master area
-    , ((modMask .|. shiftMask, xK_m     ), sendMessage Mag.Toggle) -- %! Magnify anything?
+    , ((modMask .|. shiftMask, xK_m     ), sendMessage $ XMonad.Layout.MultiToggle.Toggle MAGNIFICATION) -- %! Magnify anything?
+    , ((modMask,               xK_m     ), sendMessage $ XMonad.Layout.MultiToggle.Toggle MIRROR)
+
 
     -- floating layer support
     , ((modMask,               xK_t     ), withFocused $ windows . W.sink) -- %! Push window back into tiling
@@ -122,7 +127,11 @@ myDWConfig = defaultTheme { inactiveBorderColor =  "black"
                           , fontName            =  "Droid Sans"
                           }
 
-myLayoutHook = avoidStruts (layoutHints (dwmStyle shrinkText myDWConfig (spacing 3 $ magnify mtiled ||| Circle ||| tabbed shrinkText myDWConfig)))
+data MAGNIFICATION = MAGNIFICATION deriving (Read, Show, Eq, Typeable)
+instance Transformer MAGNIFICATION Window where
+    transform _ x k = k (magnifiercz 1.2 x)
+
+myLayoutHook = avoidStruts (layoutHints (dwmStyle shrinkText myDWConfig (spacing 3 $ mkToggle (single MIRROR) $ mkToggle (single MAGNIFICATION) $ mtiled ||| Circle ||| tabbed shrinkText myDWConfig)))
     where 
       mtiled = Mirror tiled
       tiled = Tall nmaster delta ratio
