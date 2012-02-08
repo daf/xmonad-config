@@ -131,7 +131,14 @@ data MAGNIFICATION = MAGNIFICATION deriving (Read, Show, Eq, Typeable)
 instance Transformer MAGNIFICATION Window where
     transform _ x k = k (magnifiercz 1.2 x)
 
-myLayoutHook = avoidStruts (layoutHints (dwmStyle shrinkText myDWConfig (spacing 3 $ mkToggle (single MIRROR) $ mkToggle (single MAGNIFICATION) $ mtiled ||| Circle ||| tabbed shrinkText myDWConfig)))
+myLayoutHook = avoidStruts
+               $ layoutHints
+               $ dwmStyle shrinkText myDWConfig
+               $ spacing 3
+               $ (mkToggle (single MIRROR)
+                  $ mkToggle (single MAGNIFICATION)
+                  $ mtiled ||| Circle)
+                 ||| tabbed shrinkText myDWConfig
     where 
       mtiled = Mirror tiled
       tiled = Tall nmaster delta ratio
