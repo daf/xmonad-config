@@ -1,5 +1,6 @@
-{-# OPTIONS_GHC -fglasgow-exts #-} -- required for XMonad.Layout.MultiToggle
+-- {-# OPTIONS_GHC -fglasgow-exts #-} -- required for XMonad.Layout.MultiToggle
 import XMonad
+import XMonad.Layout.CenteredMaster
 import XMonad.Hooks.DynamicLog
 import XMonad.Hooks.EwmhDesktops
 import XMonad.Util.Run (spawnPipe)
@@ -18,6 +19,7 @@ import XMonad.Layout.DwmStyle
 --import XMonad.Layout.GridVariants
 import XMonad.Layout.HintedGrid
 import Data.Ratio
+import XMonad.Layout.Drawer
 
 import qualified XMonad.StackSet as W
 import qualified Data.Map as M
@@ -28,10 +30,13 @@ import XMonad.Actions.UpdatePointer
 import XMonad.Hooks.ManageDocks
 import XMonad.Actions.FindEmptyWorkspace
 import XMonad.Layout.IndependentScreens
-import XMonad.Layout.Magnifier as Mag
+-- import XMonad.Layout.Magnifier as Mag
 import XMonad.Config.Gnome
 import XMonad.Layout.MultiToggle
 import XMonad.Layout.MultiToggle.Instances
+import XMonad.Layout.TwoPane
+import XMonad.Layout.StackTile
+import XMonad.Actions.FloatKeys
 
 -- workspaces' :: [WorkspaceId]
 -- workspaces' =  ["a", "b", "c", "d", "e", "f", "g", "h", "i"]
@@ -84,12 +89,13 @@ keys' conf@(XConfig {XMonad.modMask = modMask}) = M.fromList $
     -- resizing the master/slave ratio
     , ((modMask,               xK_h     ), sendMessage Shrink) -- %! Shrink the master area
     , ((modMask,               xK_l     ), sendMessage Expand) -- %! Expand the master area
-    , ((modMask .|. shiftMask, xK_m     ), sendMessage $ XMonad.Layout.MultiToggle.Toggle MAGNIFICATION) -- %! Magnify anything?
+    -- , ((modMask .|. shiftMask, xK_m     ), sendMessage $ XMonad.Layout.MultiToggle.Toggle MAGNIFICATION) -- %! Magnify anything?
     , ((modMask,               xK_m     ), sendMessage $ XMonad.Layout.MultiToggle.Toggle MIRROR)
-
 
     -- floating layer support
     , ((modMask,               xK_t     ), withFocused $ windows . W.sink) -- %! Push window back into tiling
+    , ((modMask,               xK_d     ), withFocused $ keysResizeWindow (-50,-50) (1,1)) -- %! shrink window
+    , ((modMask,               xK_s     ), withFocused $ keysResizeWindow (50,50) (1,1)) -- %! biggen window
 
     -- increase or decrease number of windows in the master area
     , ((modMask              , xK_comma ), sendMessage (IncMasterN 1)) -- %! Increment the number of windows in the master area
@@ -127,39 +133,44 @@ myDWConfig = defaultTheme { inactiveBorderColor =  "black"
                           , fontName            =  "Droid Sans"
                           }
 
-data MAGNIFICATION = MAGNIFICATION deriving (Read, Show, Eq, Typeable)
-instance Transformer MAGNIFICATION Window where
-    transform _ x k = k (magnifiercz 1.2 x)
+-- data MAGNIFICATION = MAGNIFICATION deriving (Read, Show, Eq, Typeable)
+-- instance Transformer MAGNIFICATION Window where
+--    transform _ x k = k (magnifiercz 1.2 x)
 
 myLayoutHook = avoidStruts
                $ layoutHints
                $ dwmStyle shrinkText myDWConfig
-               $ spacing 3
+               -- $ drawer `onBottom`
                $ (mkToggle (single MIRROR)
-                  $ mkToggle (single MAGNIFICATION)
-                  $ mtiled ||| Circle)
-                 ||| tabbed shrinkText myDWConfig
+                  -- $ mkToggle (single MAGNIFICATION)
+                  $ (spacing 3 $ (Mirror tiled) ||| grido))
+                 ||| tabbed shrinkText myDWConfig ||| dishes
     where 
-      mtiled = Mirror tiled
+      mtiled = centerMaster $ (Mirror tiled)
       tiled = Tall nmaster delta ratio
       nmaster = 1
       delta = 3/100
       ratio = 10/16
       magnify = magnifiercz (12%10)
-      dishes = tiled
+      rmagnify = magnifiercz (10%12)
+      twopane = TwoPane (3/100) (1/2)
+      stackertile = StackTile 1 (3/100) (2/3)
 --      grido = SplitGrid XMonad.Layout.GridVariants.L 1 2 (2/3) (16/10) (5/100)
 --      grido = Grid (16/10)
-      grido = Grid False
+      grido = centerMaster $ Grid True
+      drawer = simpleDrawer 0.01 0.3 (ClassName "Empathy")
+      dishes = Dishes 1 (1/8)
  
 
 myManageHook = composeAll
     [ manageDocks
      ,className =? "Display" --> doFloat
+     -- ,className =? "Steam" --> doFloat
      ,className =? "feh" --> doFloat 
      ,className =? "Eog" --> doFloat
      ,className =? "Visiblity.py" --> doIgnore
      ,className =? "Unity-2d-panel" --> doIgnore
-     ,className =? "Unity-2d-launcher" --> doIgnore ]
+     ,className =? "Unity-2d-shell" --> doIgnore ]
 
 main =  
     xmonad $ gnomeConfig
