@@ -1,4 +1,5 @@
 -- {-# OPTIONS_GHC -fglasgow-exts #-} -- required for XMonad.Layout.MultiToggle
+{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
 import XMonad
 import XMonad.Layout.CenteredMaster
 import XMonad.Hooks.DynamicLog
@@ -12,6 +13,7 @@ import XMonad.Layout.Dishes
 import XMonad.Layout.Magnifier
 import XMonad.Layout.TabBarDecoration
 import XMonad.Layout.SimpleDecoration
+import XMonad.Layout.NoFrillsDecoration
 import XMonad.Layout.Tabbed
 import XMonad.Layout.Gaps
 import XMonad.Layout.Spacing
@@ -45,12 +47,11 @@ modMask' :: KeyMask
 modMask' = mod4Mask
 
 borderWidth' :: Dimension
-borderWidth' = 2
+borderWidth' = 1
 
 normalBorderColor', focusedBorderColor' :: String
 normalBorderColor'  = "#000000"
-focusedBorderColor' = "#ffcc33"
---focusedBorderColor' = "#3696ef"
+focusedBorderColor' = "#3696ef"
 
 
 defaultGaps' :: [(Int,Int,Int,Int)]
@@ -123,29 +124,70 @@ keys' conf@(XConfig {XMonad.modMask = modMask}) = M.fromList $
         | (key, sc) <- zip [xK_bracketright, xK_bracketleft] [0..]
         , (f, m) <- [(W.view, 0), (W.shift, shiftMask)]]
 
+
 myDWConfig :: Theme
 myDWConfig = defaultTheme { inactiveBorderColor =  "black"
-                          , inactiveColor       =  "#333333"
+                          , inactiveColor       =  "#666666"
                           , inactiveTextColor   =  "black"
                           , activeBorderColor   =  "#3696ef"
-                          , activeColor         =  "#cccccc"
+                          , activeColor         =  "#285577"
                           , activeTextColor     =  "#ffffff"
-                          , fontName            =  "Droid Sans"
+                          , fontName            =  "xft:Consolas-8"
                           }
 
 -- data MAGNIFICATION = MAGNIFICATION deriving (Read, Show, Eq, Typeable)
 -- instance Transformer MAGNIFICATION Window where
 --    transform _ x k = k (magnifiercz 1.2 x)
 
+-- attempt to fill in my own accordion style layout
+data AccordStack a = AccordStack Dimension deriving ( Show, Read  )
+
+instance LayoutClass AccordStack a where
+    pureLayout (AccordStack decoHeight) sc ws = [(W.focus ws, mainRect)] ++ (reverse (zip dns bottoms)) ++ zip ups (reverse tops)
+      where
+        ups = W.up ws
+        dns = W.down ws
+        lups = fromIntegral (length ups)
+        ldns = fromIntegral (length dns)
+        mainRect = Rectangle x my w mh
+        my = y + tdh lups
+        mh = h - tdh (ldns + lups)
+        tops = map topRect $ [0..(lups - 1)]
+        bottoms = map bottomRect $ [0..(ldns - 1)]
+        tdh n = fromIntegral (n * decoHeight)
+        (Rectangle x y w h) = sc
+        topRect n = Rectangle x (y + tdh n) w (h - tdh n)
+        bottomRect n = Rectangle x (y + tdh lups + (fromIntegral mh) + tdh n) w mh
+
+data Roof a = Roof Dimension deriving ( Show, Read )
+
+instance LayoutClass Roof a where
+  pureLayout (Roof decoHeight) sc ws = [(W.focus ws, mainRect)] ++ zip ups (reverse tops) ++ zip dns (reverse bottoms)
+    where
+      ups = W.up ws
+      dns = W.down ws
+      lups = fromIntegral (length ups)
+      ldns = fromIntegral (length dns)
+      mainRect = Rectangle x my w mh
+        where
+          my = y + tdh ldns
+          mh = h - tdh ldns
+      tops = map topRect $ [0..(lups-1)]
+      bottoms = map bottomRect $ [0..(ldns-1)]
+      tdh n = fromIntegral (n * decoHeight)
+      topRect n = Rectangle x (y + tdh (ldns + 1 + n)) w (h - (tdh (ldns + 1 + n)))
+      bottomRect n = Rectangle x (y + tdh n) w (h - tdh n)
+      (Rectangle x y w h) = sc
+
 myLayoutHook = avoidStruts
-               $ layoutHints
-               $ dwmStyle shrinkText myDWConfig
-               -- $ drawer `onBottom`
+               $ hints
+               $ (noFrillsDeco shrinkText myDWConfig
                $ (mkToggle (single MIRROR)
-                  -- $ mkToggle (single MAGNIFICATION)
-                  $ (spacing 3 $ (Mirror tiled) ||| grido))
-                 ||| tabbed shrinkText myDWConfig ||| dishes
-    where 
+               -- $ mkToggle (single MAGNIFICATION)
+               $ (spacing 0 $ (Mirror tiled) ||| grido)))
+               ||| tabbed shrinkText myDWConfig ||| stackertile ||| accordo ||| roofer
+    where
+      hints = layoutHints
       mtiled = centerMaster $ (Mirror tiled)
       tiled = Tall nmaster delta ratio
       nmaster = 1
@@ -160,7 +202,8 @@ myLayoutHook = avoidStruts
       grido = centerMaster $ Grid True
       drawer = simpleDrawer 0.01 0.3 (ClassName "Empathy")
       dishes = Dishes 1 (1/8)
- 
+      accordo = noFrillsDeco shrinkText myDWConfig (AccordStack (decoHeight myDWConfig))
+      roofer = noFrillsDeco shrinkText myDWConfig (Roof (decoHeight myDWConfig))
 
 myManageHook = composeAll
     [ manageDocks
@@ -172,9 +215,9 @@ myManageHook = composeAll
      ,className =? "Unity-2d-panel" --> doIgnore
      ,className =? "Unity-2d-shell" --> doIgnore ]
 
-main =  
+main =
     xmonad $ gnomeConfig
-    { 
+    {
         workspaces = withScreens 2 ["a","b","c","d","e","f","g","h","i"],
         manageHook = myManageHook <+> manageHook gnomeConfig,
         modMask = modMask',
@@ -184,6 +227,6 @@ main =
         layoutHook = myLayoutHook,
         --defaultGaps = defaultGaps',
         terminal = terminal',
-        keys = keys' 
+        keys = keys'
     }
 
